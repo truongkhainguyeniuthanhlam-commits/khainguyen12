@@ -1,0 +1,145 @@
+-- ⚙️ CONFIG
+getgenv().webhook = "https://discord.com/api/webhooks/1435546643201261612/1a26HVjH8Ul54WRgL2UR77QQBO6YuB358rn-MsaNzFQWDuzhz6Y-iLh6_SOPbQ6uZzj1"
+getgenv().MinMoney = 5_000_000
+
+local allowedPlaceIds = {
+    [96342491571673] = true,
+    [109983668079237] = true
+}
+
+-- 📦 SERVICES
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+
+-- 💰 Chuyển đổi tiền từ text sang số
+local function parseMoney(str)
+    if not str or str == "" then return 0 end
+    local num, suffix = str:match("([%d%.]+)%s*([KMBT]?)")
+    num = tonumber(num)
+    if not num then return 0 end
+    suffix = suffix:upper()
+    local mult = ({
+        K = 1e3,
+        M = 1e6,
+        B = 1e9,
+        T = 1e12
+    })[suffix] or 1
+    return num * mult
+end
+
+-- 🔍 Quét tất cả pets trong workspace
+local function getPetInfo()
+    local results = {}
+
+    for _, plot in pairs(workspace.Plots:GetChildren()) do
+        local podiums = plot:FindFirstChild("AnimalPodiums")
+        if podiums then
+            for _, podium in pairs(podiums:GetChildren()) do
+                local display, gen
+
+                for _, obj in pairs(podium:GetDescendants()) do
+                    if obj.Name:lower():match("displayname") or obj.Name:lower():match("display") then
+                        display = obj
+                    elseif obj.Name:lower():match("generation") or obj.Name:lower():match("gen") then
+                        gen = obj
+                    end
+                end
+
+                if display and gen then
+                    local nameText = display.Text or display.Value or display.Name
+                    local genText = gen.Text or gen.Value or gen.Name
+                    local value = parseMoney(genText or "")
+
+                    if value >= getgenv().MinMoney then
+                        table.insert(results, {
+                            name = nameText or "???",
+                            gen = genText or "$???/s",
+                            value = value
+                        })
+                    end
+                end
+            end
+        end
+    end
+
+    return results
+end
+
+-- 🎨 Chọn màu ngẫu nhiên cho embed
+local function randomColor()
+    local colors = {
+        3447003, 10181046, 15158332, 3066993,
+        15844367, 15105570, 7419530, 11342935
+    }
+    return colors[math.random(1, #colors)]
+end
+
+-- 🌐 Gửi webhook
+local function sendWebhook(pets)
+    local petLines = {}
+    for _, pet in ipairs(pets) do
+        table.insert(petLines, string.format("✅ %s [%s]", pet.name, pet.gen))
+    end
+
+    local joinLink = string.format(
+        "https://chillihub1.github.io/chillihub-joiner/?placeId=%d&gameInstanceId=%s",
+        game.PlaceId, game.JobId
+    )
+
+    local teleportScript = string.format(
+        "game:GetService('TeleportService'):TeleportToPlaceInstance(%d, '%s', game.Players.LocalPlayer)",
+        game.PlaceId, game.JobId
+    )
+
+    local embed = {
+        username = "Pet Finder",
+        embeds = { {
+            title = string.format("🔍 Found %d Pets!", #pets),
+            color = randomColor(),
+            description = table.concat(petLines, "\n") ..
+                string.format(
+                    "\n\n👥 **Players**\n%d / %d\n🆔 **JobId**\n%s\n🌐 **Join Link**\n[Join Server](%s)\n📜 **Join Script**\n```lua\n%s\n```",
+                    #Players:GetPlayers(), Players.MaxPlayers, game.JobId, joinLink, teleportScript
+                ),
+            footer = { text = "Made by KhaiNguyen | AutoScan v3" },
+            timestamp = DateTime.now():ToIsoDate()
+        } }
+    }
+
+    local json = HttpService:JSONEncode(embed)
+    local requestFunc = http_request or request or (syn and syn.request) or (http and http.request)
+    if not requestFunc then return false end
+
+    pcall(function()
+        requestFunc({
+            Url = getgenv().webhook,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = json
+        })
+    end)
+end
+
+-- 🔁 Lặp quét pets liên tục, tránh gửi trùng
+local sentPets = {}
+
+task.spawn(function()
+    while true do
+        local found = getPetInfo()
+        local newPets = {}
+
+        for _, pet in ipairs(found) do
+            local id = (pet.name or "???") .. "|" .. (pet.gen or "")
+            if not sentPets[id] then
+                sentPets[id] = true
+                table.insert(newPets, pet)
+            end
+        end
+
+        if #newPets > 0 then
+            sendWebhook(newPets)
+        end
+
+        task.wait(1)
+    end
+end)
