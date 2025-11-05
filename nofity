@@ -67,10 +67,7 @@ end
 
 -- 🎨 Chọn màu ngẫu nhiên cho embed
 local function randomColor()
-    local colors = {
-        3447003, 10181046, 15158332, 3066993,
-        15844367, 15105570, 7419530, 11342935
-    }
+    local colors = {3447003, 10181046, 15158332, 3066993, 15844367, 15105570, 7419530, 11342935}
     return colors[math.random(1, #colors)]
 end
 
@@ -93,7 +90,7 @@ local function sendWebhook(pets)
 
     local embed = {
         username = "Pet Finder",
-        embeds = { {
+        embeds = {{
             title = string.format("🔍 Found %d Pets!", #pets),
             color = randomColor(),
             description = table.concat(petLines, "\n") ..
@@ -101,9 +98,9 @@ local function sendWebhook(pets)
                     "\n\n👥 **Players**\n%d / %d\n🆔 **JobId**\n%s\n🌐 **Join Link**\n[Join Server](%s)\n📜 **Join Script**\n```lua\n%s\n```",
                     #Players:GetPlayers(), Players.MaxPlayers, game.JobId, joinLink, teleportScript
                 ),
-            footer = { text = "Made by KhaiNguyen | AutoScan v3" },
+            footer = {text = "Made by KhaiNguyen | AutoScan v3"},
             timestamp = DateTime.now():ToIsoDate()
-        } }
+        }}
     }
 
     local json = HttpService:JSONEncode(embed)
@@ -114,7 +111,7 @@ local function sendWebhook(pets)
         requestFunc({
             Url = getgenv().webhook,
             Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
+            Headers = {["Content-Type"] = "application/json"},
             Body = json
         })
     end)
@@ -140,6 +137,6 @@ task.spawn(function()
             sendWebhook(newPets)
         end
 
-        task.wait(1)
+        task.wait(1) -- 2 giây quét lại
     end
 end)
